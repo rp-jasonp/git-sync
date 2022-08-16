@@ -52,7 +52,7 @@ var flVersion = pflag.Bool("version", false, "print the version and exit")
 var flHelp = pflag.BoolP("help", "h", false, "print help text and exit")
 var flManual = pflag.Bool("man", false, "print the full manual and exit")
 
-var flVerbose = pflag.IntP("verbose", "v", 0,
+var flVerbose = pflag.IntP("verbose", "v", envInt("GIT_SYNC_VERBOSE"),
 	"logs at this V level and lower will be printed")
 
 var flRepo = pflag.String("repo", envString("GIT_SYNC_REPO", ""),
@@ -511,7 +511,7 @@ func main() {
 	}
 
 	if *flSSH {
-		if err := git.SetupGitSSH(*flSSHKnownHosts, *flSSHKeyFile, *flSSHKnownHostsFile); err != nil {
+		if err := git.SetupGitSSH(*flSSHKnownHosts, *flVerbose, *flSSHKeyFile, *flSSHKnownHostsFile); err != nil {
 			log.Error(err, "can't set up git SSH", "keyFile", *flSSHKeyFile, "knownHosts", *flSSHKnownHosts, "knownHostsFile", *flSSHKnownHostsFile)
 			os.Exit(1)
 		}
@@ -1414,8 +1414,19 @@ func (git *repoSync) StoreCredentials(ctx context.Context, username, password st
 	return nil
 }
 
-func (git *repoSync) SetupGitSSH(setupKnownHosts bool, pathToSSHSecret, pathToSSHKnownHosts string) error {
+func (git *repoSync) SetupGitSSH(setupKnownHosts bool, verbose int, pathToSSHSecret, pathToSSHKnownHosts string) error {
 	git.log.V(1).Info("setting up git SSH credentials")
+
+    switch verbose {
+	    case verbose >= 3:
+		    verboseStr := "-vvv"
+	    case verbose == 2:
+		    verboseStr := "-vv"
+		case verbose == 1:
+		    verboseStr := "-v"
+	    default:
+		    verboseStr := ""
+	}
 
 	_, err := os.Stat(pathToSSHSecret)
 	if err != nil {
@@ -1427,9 +1438,9 @@ func (git *repoSync) SetupGitSSH(setupKnownHosts bool, pathToSSHSecret, pathToSS
 		if err != nil {
 			return fmt.Errorf("can't access SSH known_hosts: %w", err)
 		}
-		err = os.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -o UserKnownHostsFile=%s -i %s", pathToSSHKnownHosts, pathToSSHSecret))
+		err = os.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh %s -o UserKnownHostsFile=%s -i %s", verboseStr, pathToSSHKnownHosts, pathToSSHSecret))
 	} else {
-		err = os.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -o StrictHostKeyChecking=no -i %s", pathToSSHSecret))
+		err = os.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh %s -o StrictHostKeyChecking=no -i %s", verboseStr, pathToSSHSecret))
 	}
 
 	// set env variable GIT_SSH_COMMAND to force git use customized ssh command
@@ -1909,7 +1920,7 @@ OPTIONS
             The username to use for git authentication (see --password-file or
             --password).
 
-    -v, --verbose <int>
+    -v, --verbose <int>, $GIT_SYNC_VERBOSE
             Set the log verbosity level.  Logs at this level and lower will be
             printed.  (default: 0)
 
