@@ -52,7 +52,7 @@ var flVersion = pflag.Bool("version", false, "print the version and exit")
 var flHelp = pflag.BoolP("help", "h", false, "print help text and exit")
 var flManual = pflag.Bool("man", false, "print the full manual and exit")
 
-var flVerbose = pflag.IntP("verbose", "v", envInt("GIT_SYNC_VERBOSE"),
+var flVerbose = pflag.IntP("verbose", "v", envInt("GIT_SYNC_VERBOSE", 0),
 	"logs at this V level and lower will be printed")
 
 var flRepo = pflag.String("repo", envString("GIT_SYNC_REPO", ""),
@@ -1417,15 +1417,16 @@ func (git *repoSync) StoreCredentials(ctx context.Context, username, password st
 func (git *repoSync) SetupGitSSH(setupKnownHosts bool, verbose int, pathToSSHSecret, pathToSSHKnownHosts string) error {
 	git.log.V(1).Info("setting up git SSH credentials")
 
-    switch verbose {
-	    case verbose >= 3:
-		    verboseStr := "-vvv"
-	    case verbose == 2:
-		    verboseStr := "-vv"
-		case verbose == 1:
-		    verboseStr := "-v"
-	    default:
-		    verboseStr := ""
+	verboseStr := ""
+	switch {
+	case verbose >= 3:
+		verboseStr = "-vvv"
+	case verbose == 2:
+		verboseStr = "-vv"
+	case verbose == 1:
+		verboseStr = "-v"
+	default:
+		verboseStr = ""
 	}
 
 	_, err := os.Stat(pathToSSHSecret)
@@ -1473,8 +1474,9 @@ func (git *repoSync) SetupCookieFile(ctx context.Context) error {
 //
 // The expected URL callback output is below,
 // see https://git-scm.com/docs/gitcredentials for more examples:
-//   username=xxx@example.com
-//   password=xxxyyyzzz
+//
+//	username=xxx@example.com
+//	password=xxxyyyzzz
 func (git *repoSync) CallAskPassURL(ctx context.Context) error {
 	git.log.V(2).Info("calling auth URL to get credentials")
 
